@@ -78,39 +78,47 @@ ARM Templates allow you to declare what you intend to deploy without having to w
 
 ```json
 {
-    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
-    "contentVersion": "1.0.0.0",
-    "parameters": {
-        "storageName": {
-            "type": "string",
-            "minLength": 3,
-            "maxLength": 24,
-            "metadata": {
-                "description": "Storage account name"
-            }
-        }
-    },
-    "variables": {
-        "uniqueStorName": "[concat(parameters('storageName'), uniqueString(resourceGroup().id))]"
-    },
-    "resources": [
-        {
-            "type": "Microsoft.Storage/storageAccounts",
-            "apiVersion": "2021-04-01",
-            "name": "[variables('uniqueStorName')]",
-            "location": "East US",
-            "sku": {
-                "name": "Standard_LRS",
-                "tier": "Standard"
-            },
-            "kind": "StorageV2",
-            "properties": {
-                "supportsHttpsTrafficOnly": true
-            }
-        }
-    ],
-    "outputs": {}
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "storageName": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 24,
+      "metadata": {
+        "description": "Storage account name"
+      }
+    }
+  },
+  "variables": {
+    "uniqueStorName": "[concat(parameters('storageName'), uniqueString(resourceGroup().id))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2021-04-01",
+      "name": "[variables('uniqueStorName')]",
+      "location": "East US",
+      "sku": {
+        "name": "Standard_LRS",
+        "tier": "Standard"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "supportsHttpsTrafficOnly": true
+      }
+    }
+  ],
+  "outputs": {}
 }
 ```
 
-Here, we are creating a storage account that should be unique every time. With the help of parameters, we can provide a different storage account name each time we use this template. With the help of variables, we can reuse the same parameter and make the storage account name unique by combining it with the `uniqueString()` function.
+### Explanation
+
+Here, we are creating a Storage Account whose name should be unique every time the template is deployed.
+
+* **Parameter (`storageName`)**: Allows us to provide a different storage account name each time we deploy the template.
+* **Variable (`uniqueStorName`)**: Reuses the parameter value and combines it with the `uniqueString(resourceGroup().id)` function to generate a unique storage account name.
+* **Resource**: Creates an Azure Storage Account with the **Standard_LRS** SKU in the **East US** region.
+* **Properties**: Enables HTTPS-only traffic for secure access.
+* **Outputs**: Currently empty, but it can be used to return values (such as the storage account name or resource ID) after the deployment is completed.
