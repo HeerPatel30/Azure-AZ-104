@@ -50,3 +50,53 @@ ARM templates allow you to declare what you intend to deploy without having to w
 5. You can review the history from the azure portal of your deployment and all parameter used in it.
 
  
+##
+# ARM template structure 
+1. Schema :  Specifies the location of the json schema file.
+2. Content Version : It specifies the version of the template
+3. Parameters : Provides the values during the deployment which helps to use the same template at different environments.
+4. Variables : Used to define values that can be reused through templates.
+5. Resources:  Contains the resources you want to deploy or update.
+6. Output : Used to define the values that will return after the deployment.
+
+## 
+# Example for the ARM. 
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "storageName":{
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 24,
+            "metadata": {
+                "description": "Storage account name"
+            }
+
+        }
+    },
+    "variables": {
+        "uniqueStorName" : "[concat(parameters('storageName'), uniqueString(resourceGroup().id))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2021-04-01",
+            "name": "[variables('uniqueStorName')]",
+            "location": "East US",
+            "sku": {
+                "name" : "Standard_LRS",
+                "tier" : "Standard"
+            },
+            "kind": "StorageV2",
+            "properties": {
+               "supportsHttpsTrafficOnly": true
+            }
+        }
+    ],
+    "outputs": {}
+}
+
+here we are creating the stoarge which should be unqiue everytime, So with help of parameter we can have the different name everytime we use this template and with the help of the variables we can resure the same parameteres that to uniquely. 
+
+
