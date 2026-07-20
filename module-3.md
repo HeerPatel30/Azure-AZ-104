@@ -1,767 +1,326 @@
-# Configure Storage Accounts (AZ-104)
-
-## Module Overview
-
-Azure Storage provides secure, scalable, durable, and highly available cloud storage services. A Storage Account acts as a container that groups Azure Storage services together and provides a unique namespace for your data.
-
-In this module, you'll learn how to:
-
-- Understand Azure Storage fundamentals
-- Implement Azure Storage accounts
-- Explore different Azure Storage services
-- Choose the correct storage account type
-- Configure replication strategies
-- Secure access to storage
-- Protect storage endpoints
+# Configure Storage Accounts & Configure Azure Blob Storage — Notes
 
 ---
 
-# 1. Introduction
+# PART 1: Configure Storage Accounts
 
-## What is Azure Storage?
+## 1. Implement Azure Storage
 
-Azure Storage is Microsoft's cloud storage platform designed to store massive amounts of data while providing high availability, durability, scalability, and security.
+[Azure Storage](https://learn.microsoft.com/en-us/azure/storage/common/storage-introduction) is Microsoft's cloud storage solution for modern data storage scenarios — a massively scalable object store, a file system service for the cloud, a messaging store for reliable messaging, and a NoSQL store. It's AI-ready and used for file shares, working data (websites, mobile/desktop apps), IaaS virtual machines, and PaaS cloud services.
 
-Azure Storage is used for:
+### Categories of Data
 
-- Storing files
-- Virtual machine disks
-- Application data
-- Backups
-- Logs
-- Images and videos
-- Big data analytics
+| Category | Description | Storage Examples |
+|---|---|---|
+| **Virtual machine data** | Disks (persistent block storage for IaaS VMs) and files. Number of data disks depends on VM size. | Azure managed disks — used for database files, static website content, custom app code. |
+| **Unstructured data** | Least organized; *nonrelational* format. | **Azure Blob Storage** (highly scalable REST-based object store) and **Azure Data Lake Storage** (HDFS as a service). |
+| **Structured data** | Relational format with a shared schema — rows, columns, keys. | **Azure Table Storage** (autoscaling NoSQL), **Azure Cosmos DB** (globally distributed DB), **Azure SQL Database** (fully managed DBaaS). |
 
-### Key Benefits
+### Key Features to Consider
 
-- Highly Available
-- Durable
-- Secure
-- Scalable
-- Accessible from anywhere
-- Fully managed by Microsoft
-
----
-
-# 2. Implement Azure Storage
-
-## Storage Account
-
-A Storage Account is the top-level Azure resource that provides a unique namespace for storing data.
-
-Example:
-
-https://mystorageaccount.blob.core.windows.net
-
-Everything stored inside Azure Storage belongs to a Storage Account.
-
-A storage account provides:
-
-- Authentication
-- Authorization
-- Billing
-- Replication
-- Networking
-- Encryption
-- Monitoring
+- **Durability & availability** — redundancy protects against transient hardware failures; replicate across datacenters/regions for protection from local or regional disasters.
+- **Secure access** — all data is encrypted; fine-grained access control.
+- **Scalability** — designed to be massively scalable for modern application needs.
+- **Manageability** — Microsoft handles hardware maintenance, updates, and critical issues.
+- **Data accessibility** — accessible worldwide over HTTP/HTTPS; SDKs available for .NET, Java, Node.js, Python, PHP, Ruby, Go, plus REST API, PowerShell, and CLI. Azure portal and Storage Explorer provide visual management.
+- **SFTP support** — Blob Storage can use SFTP if **hierarchical namespace (HNS)** is enabled (set at account creation under Advanced, or later under Settings → Configuration).
+- **NFSv3 protocol support** — lets Linux clients mount a Blob container like an NFS share; simplifies migration from Linux file workloads.
+- **Default authorization preferences** — enabling **"Default to Microsoft Entra authorization"** makes RBAC the default over shared access keys, improving security.
 
 ---
 
-## Storage Account Components
+## 2. Explore Azure Storage Services
 
-Each storage account can contain multiple storage services:
+### Azure Blob Storage
+Microsoft's object storage solution for the cloud — optimized for massive amounts of unstructured/nonrelational data (text or binary). Ideal for:
+- Serving images/documents directly to a browser
+- Storing files for distributed access
+- Streaming video and audio
+- Backup, restore, disaster recovery, and archiving
+- Data analysis by on-premises or Azure-hosted services
 
-- Blob Containers
-- File Shares
-- Queues
-- Tables
+Accessible worldwide via HTTP/HTTPS, URLs, REST API, PowerShell, CLI, or client libraries (.NET, Java, Node.js, Python, PHP, Ruby).
+
+### Azure Files
+Highly available network file shares accessible via **SMB** and **NFS** protocols. Multiple VMs can share the same files with read/write access; also accessible via REST or client libraries.
+
+Common uses:
+- Migrating on-premises apps that use file shares (minimal changes if mounted to the same drive letter)
+- Storing configuration files, shared tools/utilities across multiple VMs
+- Storing diagnostic logs, metrics, and crash dumps
+
+> Storage account credentials authenticate access — all users with the share mounted get full read/write access.
+
+### Azure Queue Storage
+Stores and retrieves messages (up to **64 KB** each; a queue can hold millions of messages). Used for asynchronous processing — e.g., a customer uploads a picture, a message is queued, and an Azure Function retrieves it later to generate thumbnails. Each processing part scales independently.
+
+### Azure Table Storage
+Stores nonrelational structured data (NoSQL) — a key/attribute store with a schemaless design, making it easy to adapt data as application needs evolve. Fast and cost-effective compared to traditional SQL at similar volumes. A newer **Azure Cosmos DB Table API** offers throughput-optimized tables, global distribution, and automatic secondary indexes.
 
 ---
 
-## Create a Storage Account
+## 3. Determine Storage Account Types
 
-When creating a storage account, you must choose:
+General-purpose Azure storage accounts have two basic types: **Standard** and **Premium**.
 
-- Subscription
-- Resource Group
-- Storage Account Name
-- Region
-- Performance Tier
-- Replication Option
-- Security Settings
-- Networking Configuration
+- **Standard** — backed by HDDs; lowest cost per GB; good for bulk storage or infrequently accessed data.
+- **Premium** — backed by SSDs; consistent low latency; good for VM disks and I/O-intensive apps like databases.
+
+> You **cannot convert** a Standard account to Premium (or vice versa) — you must create a new account and migrate data. All account types are encrypted at rest via SSE.
+
+| Storage Account | Supported Services | Redundancy Options | Recommended Usage |
+|---|---|---|---|
+| **Standard general-purpose v2** | Blob (incl. Data Lake Storage), Queue, Table, Azure Files | LRS, GRS, RA-GRS, ZRS, GZRS, RA-GZRS | Most scenarios — blobs, file shares, queues, tables, disks (page blobs). |
+| **Premium block blobs** | Blob Storage (incl. Data Lake Storage) | LRS, ZRS | High transaction rates, smaller objects, consistently low latency. Scales with your app. |
+| **Premium file shares** | Azure Files | LRS, ZRS | Enterprise/high-performance apps needing both SMB and NFS support. |
+| **Premium page blobs** | Page blobs only | LRS only | Index-based/sparse data structures — OS disks, VM data disks, databases. |
+
+> Legacy account types (GPv1, legacy BlobStorage) still exist on some subscriptions — Microsoft recommends upgrading to GPv2 (supported in-place via portal, CLI, or PowerShell).
 
 ---
 
-## Storage Account Name Rules
+## 4. Determine Replication Strategies
 
-- Must be globally unique
-- Between 3 and 24 characters
-- Lowercase letters only
-- Numbers allowed
-- No spaces
-- No special characters
+Data in a storage account is always replicated for durability and high availability, protecting against transient hardware failures, network/power outages, and natural disasters — while helping meet the Azure Storage SLA.
 
-Example:
+| Strategy | Description |
+|---|---|
+| **Locally Redundant Storage (LRS)** | Lowest cost, least durable — replicates within a single datacenter. All replicas could be lost in a datacenter-level disaster. Suitable for easily reconstructible data, constantly changing/non-essential data (e.g. live feeds), or where governance restricts replication to one location. |
+| **Zone Redundant Storage (ZRS)** | Synchronously replicates across **three storage clusters** in separate availability zones within a single region. Each zone is autonomous with separate utilities/networking. Provides access even if a zone is unavailable. Not available in all regions; migrating to ZRS requires physical data movement. |
+| **Geo-Redundant Storage (GRS)** | Replicates to a secondary region hundreds of miles away — **16 9's durability**. Data is first replicated locally (LRS) in the primary region, then asynchronously to the secondary region (also as LRS there). **GRS**: secondary data is readable only after a Microsoft-initiated failover. **RA-GRS**: adds the ability to read from the secondary region at any time, regardless of failover. |
+| **Geo-Zone-Redundant Storage (GZRS)** | Combines ZRS (3 zones in primary region) with geo-replication to a secondary paired region — **16 9's durability**. Keeps working during a zone outage *and* protects against regional disaster. **RA-GZRS** adds optional read access to the secondary region. Recommended for apps needing consistency, durability, high availability, and disaster resilience. |
 
+### Durability/Availability Comparison
+
+| Node unavailable | Entire datacenter unavailable | Region-wide outage | Read access during region-wide outage |
+|---|---|---|---|
+| LRS, ZRS, GRS, RA-GRS, GZRS, RA-GZRS | ZRS, GRS, RA-GRS, GZRS, RA-GZRS | GRS, RA-GRS, GZRS, RA-GZRS | RA-GRS, RA-GZRS |
+
+---
+
+## 5. Access Storage
+
+Every object in Azure Storage has a unique URL. The **storage account name** forms the subdomain; combined with the service-specific domain, this forms the account's endpoint.
+
+Example — account named `mystorageaccount`:
+
+| Service | Default Endpoint |
+|---|---|
+| **Container (Blob) service** | `mystorageaccount.blob.core.windows.net` |
+| **Table service** | `mystorageaccount.table.core.windows.net` |
+| **Queue service** | `mystorageaccount.queue.core.windows.net` |
+| **File service** | `mystorageaccount.file.core.windows.net` |
+
+Object URL example — blob `myblob` in container `mycontainer`:
 ```
-storageprod001
+https://mystorageaccount.blob.core.windows.net/mycontainer/myblob
 ```
 
----
+### Custom Domains
+You can map a custom domain (e.g., `www.contoso.com`) to the blob/web endpoint so users access blob data through your own domain.
 
-# 3. Explore Azure Storage Services
-
-Azure Storage contains four primary services.
-
----
-
-## Blob Storage
-
-Blob Storage stores unstructured data.
-
-Examples:
-
-- Images
-- Videos
-- PDFs
-- Backups
-- Logs
-- Documents
-
-Blob Storage is ideal when file structure isn't important.
-
-### Blob Types
-
-### Block Blob
-
-Used for:
-
-- Documents
-- Images
-- Videos
-- Backups
-
-Most common blob type.
+- **Direct mapping** — create a `CNAME` DNS record pointing your subdomain to the storage account endpoint.
+  - Example: subdomain `blobs.contoso.com` → `CNAME` → `contosoblobs.blob.core.windows.net`
 
 ---
 
-### Append Blob
+## 6. Secure Storage Endpoints
 
-Optimized for appending data.
+In the Azure portal, use the **Firewalls and virtual networks** settings to configure service endpoints and restrict network access to specific subnets or public IPs.
 
-Commonly used for:
+- Service endpoints provide the base URL for any blob, queue, table, or file object.
+- You can allow access to one or more public IP ranges.
+- Subnets/virtual networks must be in the **same Azure region or region pair** as the storage account.
+- Always test the endpoint to confirm it restricts access as expected.
 
-- Logging
-- Audit files
+### Private Endpoints
+Azure Storage also supports **private endpoints** for enhanced security and network isolation — the recommended approach for **production workloads**.
 
----
+- Assigns a **private IP address** from your VNet to the storage account.
+- All traffic between the VNet and the storage service travels over the **Microsoft backbone network**, with no exposure to the public internet.
 
-### Page Blob
-
-Stores random-access files.
-
-Mainly used for:
-
-- Azure Virtual Machine disks
-
----
-
-## Azure Files
-
-Azure Files provides fully managed network file shares.
-
-Supports:
-
-- SMB protocol
-- NFS protocol
-
-Can be mounted by:
-
-- Windows
-- Linux
-- macOS
-
-Common Uses:
-
-- Shared company files
-- Lift-and-shift applications
-- Home directories
+| | Service Endpoints | Private Endpoints |
+|---|---|---|
+| **Storage account address** | Stays on its public endpoint | Gets a private IP from your VNet |
+| **Traffic path** | Restricted to specific VNets/subnets, some public internet exposure | Entirely within the Microsoft backbone |
+| **Best for** | Development scenarios, simpler configuration | Production workloads needing full network isolation / compliance |
 
 ---
 
-## Queue Storage
+# PART 2: Configure Azure Blob Storage
 
-Queue Storage stores messages.
+## 1. Implement Azure Blob Storage
 
-Used for communication between application components.
+**Blob** = Binary Large Object. Azure Blob Storage stores unstructured data in the cloud as objects/blobs — also called *object storage* or *container storage*. Can store any type of text or binary data (documents, images, video, installers).
 
-Supports asynchronous processing.
+### Three Core Resources
+1. **Azure storage account**
+2. **Containers** in the storage account
+3. **Blobs** within a container
 
-Maximum message size:
+### Configuration Settings
+- Blob container options
+- Blob types and upload options
+- Blob Storage access tiers
+- Blob lifecycle rules
+- Blob object replication options
 
-64 KB
-
-Examples:
-
-- Order processing
-- Background jobs
-- Microservices communication
-
----
-
-## Table Storage
-
-NoSQL key-value database.
-
-Stores structured but non-relational data.
-
-Characteristics:
-
-- Schema-less
-- Fast
-- Low cost
-- Massive scalability
-
-Examples:
-
-- User profiles
-- Device information
-- Metadata
+### Common Use Cases
+- Serving images/documents directly to a browser
+- Distributed access to files (e.g., during installs)
+- Streaming video and audio
+- Backup, restore, disaster recovery, archiving
+- Data analysis by on-premises or Azure-hosted services
 
 ---
 
-# 4. Determine Storage Account Types
+## 2. Create Blob Containers
 
-Azure offers different storage account types.
+A blob **cannot exist on its own** — it must live inside a container.
 
----
+### Things to Know
+- All blobs must be in a container.
+- Containers organize your blob storage.
+- A container can hold **unlimited blobs**.
+- A storage account can hold **unlimited containers**.
+- You must create a container before uploading data.
 
-## General-purpose v2 (GPv2)
+### Container Configuration
 
-Recommended for almost all workloads.
+**Name rules:**
+- Must be unique within the storage account.
+- Lowercase letters, numbers, and hyphens only.
+- Must start with a letter or number.
+- Length: **3–63 characters**.
 
-Supports:
+**Public access levels:**
 
-- Blob Storage
-- Azure Files
-- Queues
-- Tables
-- Azure Data Lake Storage Gen2
+| Level | Description |
+|---|---|
+| **Private** *(default)* | No anonymous access to the container or blobs. |
+| **Blob** | Anonymous public **read** access to blobs only. |
+| **Container** | Anonymous public **read and list** access to the entire container, including blobs. |
 
-Supports:
-
-- Lifecycle Management
-- Blob Versioning
-- Soft Delete
-- Hot/Cool/Cold/Archive tiers
-
-Microsoft recommends GPv2.
-
----
-
-## General-purpose v1 (GPv1)
-
-Legacy storage account.
-
-Supports fewer features.
-
-Avoid using GPv1 for new deployments.
+> Blob/Container access levels only take effect if the storage account's **"Allow Blob anonymous access"** setting is enabled. If disabled, all containers stay private regardless of their individual setting. Microsoft recommends keeping anonymous access disabled at the account level unless serving public content.
 
 ---
 
-## Blob Storage Account
+## 3. Assign Blob Access Tiers
 
-Legacy account.
+Azure Storage supports four access tiers, each optimized for a usage pattern: **Hot, Cool, Cold, and Archive**.
 
-Supports only Blob Storage.
+| Tier | Optimized For | Notes |
+|---|---|---|
+| **Hot** | Frequent reads/writes | Highest storage cost, lowest access cost. Good for actively processed data. |
+| **Cool** | Infrequently accessed data, kept ≥ **30 days** | Lower storage cost, higher access cost than Hot. Good for short-term backup/DR data, older media that must stay immediately available. |
+| **Cold** | Infrequently accessed data, kept ≥ **90 days** | Lower storage cost, higher access cost than Cool. |
+| **Archive** | Offline data tolerating hours of retrieval latency, kept ≥ **180 days** (early deletion charge otherwise) | Most cost-effective for storage; most expensive to access. Good for secondary backups, raw data, compliance records. |
 
-Mostly replaced by GPv2.
+### Rehydrating Archived Blobs
+To access Archive-tier content, rehydrate it to Hot, Cool, or Cold using:
+- **Copy Blob** *(recommended)* — creates a new blob in an online tier.
+- **Set Blob Tier** — changes the tier in place.
 
----
+Both support:
+- **Standard priority** — up to 15 hours.
+- **High priority** — within 1 hour for objects under 10 GB (higher cost) — useful for urgent DR retrieval.
 
-## Premium Block Blob
+### Tier Comparison
 
-SSD-based storage.
-
-Best for:
-
-- High transaction workloads
-- AI
-- Media
-- Analytics
-
----
-
-## Premium FileStorage
-
-Premium Azure Files.
-
-SSD-backed.
-
-Low latency.
+| Comparison | Hot | Cool | Cold | Archive |
+|---|---|---|---|---|
+| **Availability** | 99.9% | 99% | 99% | 99% |
+| **Availability (RA-GRS reads)** | 99.99% | 99.9% | 99.9% | 99.9% |
+| **Latency (time to first byte)** | milliseconds | milliseconds | milliseconds | hours |
+| **Minimum storage duration** | N/A | 30 days | 90 days | 180 days |
 
 ---
 
-## Premium Page Blob
+## 4. Add Blob Lifecycle Management Rules
 
-Optimized for Azure VM disks.
+Every dataset has a lifecycle — heavily accessed early on, then progressively less as it ages. Azure Blob Storage supports rule-based **lifecycle management** for GPv2 and Premium block blob accounts (legacy accounts supported too, but GPv2 is recommended) to automatically transition data between tiers or expire it.
 
----
+### What Lifecycle Rules Can Do
+- Transition blobs to a cooler tier: Hot→Cool, Hot→Cold, Hot→Archive, Cool→Cold, Cool→Archive, Cold→Archive.
+- Delete current versions, previous versions, or snapshots of a blob at end of life.
+- Auto-transition blobs from **Cool back to Hot** when accessed — optimizes for unpredictable access patterns without early deletion charges.
+- Apply rules to an entire storage account, select containers, or a subset of blobs (via name prefixes or blob index tags).
 
-## Performance Tiers
+### Business Scenario Example
+Data accessed frequently early on, occasionally after 2 weeks, and rarely after a month → Hot tier initially, Cool tier for occasional access, Archive tier once aged past a month. Lifecycle rules automate this transition.
 
-### Standard
+### Configuring a Rule (If–Then Logic)
 
-Uses HDD storage.
+- **If** clause: sets the evaluation condition.
+  - **More than (days ago)** — number of days since last access/modification to trigger the rule.
+- **Then** clause: sets the resulting action.
+  - **Move to cool storage**
+  - **Move to cold storage**
+  - **Move to archive storage**
+  - **Delete the blob**
 
-Advantages:
-
-- Lower cost
-- Suitable for backups
-- General-purpose workloads
-
----
-
-### Premium
-
-Uses SSD storage.
-
-Advantages:
-
-- Low latency
-- High throughput
-- High IOPS
-
-Best for production workloads.
+Well-designed rules based on data age let you minimize storage costs automatically.
 
 ---
 
-# 5. Determine Replication Strategies
+## 5. Determine Blob Object Replication
 
-Azure automatically replicates your data to protect against failures.
+**Object replication** asynchronously copies blobs in a container between storage accounts based on policy rules you configure — including blob content, metadata properties, and versions.
 
----
+### Things to Know
+- Requires **Blob versioning** enabled on **both** the source and destination accounts — this lets you access/recover earlier blob versions.
+- Does **not** support blob snapshots — snapshots on the source aren't replicated.
+- Supported when source and destination are in **Hot, Cool, or Cold** tiers — they can be in different tiers from each other.
+- You configure a **replication policy** specifying the source and destination storage accounts.
+- A policy includes one or more **rules**, each specifying a source container, destination container, and which blobs to replicate.
 
-## LRS (Locally Redundant Storage)
-
-Copies:
-
-3
-
-Location:
-
-Single datacenter
-
-Protects against:
-
-- Disk failure
-- Server failure
-
-Does NOT protect against datacenter failure.
-
-Lowest cost.
+### Why Use Object Replication
+- **Reduce latency** — let clients read from a region closer to them.
+- **Improve compute efficiency** — process the same blob sets in different regions.
+- **Optimize data distribution** — analyze data in one location, replicate only the results elsewhere.
+- **Reduce costs** — move replicated data to the Archive tier via lifecycle management after replication.
 
 ---
 
-## ZRS (Zone-Redundant Storage)
+## 6. Manage Blobs
 
-Copies:
+A blob can be any file type/size. Azure Storage offers three blob types:
 
-3
+| Type | Description | Use Case |
+|---|---|---|
+| **Block blob** | Made of assembled data blocks. Default blob type. | Most scenarios — storing text/binary data like files, images, videos. |
+| **Append blob** | Also block-based, but optimized for **append** operations. | Logging scenarios where data keeps growing. |
+| **Page blob** | Up to **8 TB**; efficient for frequent read/write operations. | Used by Azure VMs for OS disks and data disks. |
 
-Across:
+> Once a blob is created, its type **cannot be changed**.
 
-Multiple Availability Zones
+### Upload/Management Tools
 
-Protects against:
-
-Zone failures.
-
----
-
-## GRS (Geo-Redundant Storage)
-
-Copies:
-
-6
-
-Primary Region:
-
-3 copies
-
-Secondary Region:
-
-3 copies
-
-Protects against:
-
-Regional disasters.
-
-Secondary region cannot be read.
+- **Azure portal** — good for uploading/managing a small number of files; set blob type, block size, container folder, access tier, and encryption scope.
+- **Azure Storage Explorer** — upload, download, and manage blobs, files, queues, tables, Data Lake Storage entities, and managed disks; view/edit resources, preview data, configure permissions.
+- **AzCopy** — command-line tool (Windows/Linux) for copying data to/from Blob Storage, across containers and storage accounts.
+- **Azure Data Box Disk** — for transferring large on-premises datasets to Blob Storage when uploading over the network isn't practical; request SSDs from Microsoft, copy data locally, ship back for upload.
 
 ---
 
-## RA-GRS
+## 7. Determine Blob Storage Pricing
 
-Same as GRS.
+Use the **Azure Pricing Calculator** to estimate migration, monthly, and future costs based on your workload.
 
-Difference:
+### Cost Depends On
+- Volume of data stored per month.
+- Quantity/type of operations performed, plus data transfer costs.
+- Data redundancy option selected.
 
-Secondary region is readable.
+### Billing Considerations
 
-Useful for:
-
-- Disaster Recovery
-- Reporting
-
----
-
-## GZRS
-
-Combines:
-
-- Zone replication
-- Geo replication
-
-Provides very high availability.
+| Factor | Description |
+|---|---|
+| **Performance tiers** | Cooler tiers = lower per-GB storage cost. |
+| **Data access costs** | Increase as the tier gets cooler — Cool, Cold, and Archive incur a per-GB charge for read actions. |
+| **Transaction costs** | Per-transaction charge on all tiers, increasing as the tier gets cooler. |
+| **Geo-replication data transfer costs** | Applies only to accounts with geo-replication configured — per-GB charge. |
+| **Outbound data transfer costs** | Billed per GB for bandwidth usage — consistent with standard storage accounts. |
+| **Changing storage tier** | Cool → Hot: charged as if reading all existing data. Hot → Cool: charged as if writing all data into Cool (GPv2 accounts only). |
 
 ---
-
-## RA-GZRS
-
-Adds read access to GZRS secondary region.
-
-Highest redundancy option.
-
----
-
-## Replication Comparison
-
-| Replication | Copies | Zone Protection | Region Protection | Read Secondary |
-|-------------|--------|-----------------|------------------|----------------|
-| LRS | 3 | No | No | No |
-| ZRS | 3 | Yes | No | No |
-| GRS | 6 | No | Yes | No |
-| RA-GRS | 6 | No | Yes | Yes |
-| GZRS | 6 | Yes | Yes | No |
-| RA-GZRS | 6 | Yes | Yes | Yes |
-
----
-
-# 6. Access Storage
-
-Azure provides several methods to access storage securely.
-
----
-
-## Microsoft Entra ID
-
-Recommended authentication method.
-
-Benefits:
-
-- Azure RBAC
-- MFA
-- Conditional Access
-- Least privilege
-
-Best option for users and applications.
-
----
-
-## Access Keys
-
-Each storage account has:
-
-- Key1
-- Key2
-
-Provide full administrative access.
-
-Use only when necessary.
-
-Rotate keys regularly.
-
----
-
-## Shared Access Signature (SAS)
-
-A SAS provides temporary, limited access to storage resources.
-
-You can specify:
-
-- Permissions
-- Start time
-- Expiry time
-- Allowed IP addresses
-- HTTPS only
-
-Types:
-
-- Service SAS
-- Account SAS
-- User Delegation SAS
-
-User Delegation SAS is the most secure because it uses Microsoft Entra ID.
-
----
-
-# 7. Secure Storage Endpoints
-
-Azure Storage endpoints should always be secured.
-
----
-
-## HTTPS Only
-
-Always enable Secure Transfer Required.
-
-Prevents unencrypted HTTP traffic.
-
-Recommended for production.
-
----
-
-## Storage Firewall
-
-Restrict access by:
-
-- Public IP addresses
-- Azure Virtual Networks
-- Selected Networks
-
-Blocks unauthorized traffic.
-
----
-
-## Service Endpoint
-
-Allows secure communication between Azure Virtual Networks and Azure Storage.
-
-Traffic stays on Microsoft's backbone network.
-
-Storage account still uses its public endpoint.
-
----
-
-## Private Endpoint
-
-Provides a private IP address inside a Virtual Network.
-
-Traffic never leaves the Azure private network.
-
-Highest level of security.
-
-Ideal for sensitive workloads.
-
----
-
-## Encryption
-
-Azure Storage encrypts all data at rest automatically.
-
-Encryption Algorithm:
-
-AES-256
-
-Enabled by default.
-
----
-
-## Microsoft-managed Keys
-
-Default encryption option.
-
-Microsoft manages key lifecycle.
-
----
-
-## Customer-managed Keys
-
-Keys stored in Azure Key Vault.
-
-Provides:
-
-- Greater control
-- Compliance
-- Key rotation
-
----
-
-## Soft Delete
-
-Protects data from accidental deletion.
-
-Supported for:
-
-- Blob Storage
-- File Shares
-- Containers
-
-Deleted data can be restored within the retention period.
-
----
-
-## Blob Versioning
-
-Automatically creates previous versions whenever a blob changes.
-
-Allows rollback to earlier versions.
-
----
-
-## Lifecycle Management
-
-Automatically moves blobs between access tiers.
-
-Example Policy:
-
-30 Days → Cool
-
-90 Days → Cold
-
-180 Days → Archive
-
-365 Days → Delete
-
-Helps reduce storage costs.
-
----
-
-# AZ-104 Exam Tips
-
-## Remember these:
-
-### Storage Services
-
-| Service | Stores |
-|----------|--------|
-| Blob | Unstructured data |
-| Files | SMB/NFS file shares |
-| Queue | Messages |
-| Table | NoSQL structured data |
-
----
-
-### Storage Account Type
-
-GPv2 = Recommended
-
----
-
-### Performance
-
-Standard = HDD
-
-Premium = SSD
-
----
-
-### Replication
-
-LRS = Single datacenter
-
-ZRS = Availability Zones
-
-GRS = Secondary Region
-
-RA-GRS = Readable Secondary
-
-GZRS = Zone + Geo
-
-RA-GZRS = Zone + Geo + Read
-
----
-
-### Authentication
-
-Microsoft Entra ID → Best
-
-SAS → Temporary access
-
-Access Keys → Full account access
-
----
-
-### Networking
-
-Service Endpoint
-
-- Public endpoint
-- Azure backbone
-
-Private Endpoint
-
-- Private IP
-- Highest security
-
----
-
-### Security Best Practices
-
-✔ Enable HTTPS only
-
-✔ Disable anonymous access
-
-✔ Use Microsoft Entra ID
-
-✔ Rotate access keys
-
-✔ Use SAS instead of sharing keys
-
-✔ Use Private Endpoints
-
-✔ Enable Soft Delete
-
-✔ Enable Blob Versioning
-
-✔ Enable Lifecycle Management
-
-✔ Use least privilege RBAC
-
----
-
-# Quick Revision
-
-Azure Storage → Cloud storage platform
-
-Storage Account → Management boundary
-
-Blob → Unstructured data
-
-Files → SMB/NFS shares
-
-Queue → Messaging
-
-Table → NoSQL
-
-GPv2 → Recommended storage account
-
-Standard → HDD
-
-Premium → SSD
-
-LRS → Same datacenter
-
-ZRS → Availability Zones
-
-GRS → Secondary region
-
-RA-GRS → Read secondary
-
-Service Endpoint → Public endpoint over Azure backbone
-
-Private Endpoint → Private IP
-
-SAS → Temporary delegated access
-
-Microsoft Entra ID → Recommended authentication
-
-Encryption → AES-256 enabled by default
-
-Soft Delete → Recover deleted data
-
-Blob Versioning → Restore previous versions
-
-Lifecycle Management → Automatically move/delete blobs based on age
